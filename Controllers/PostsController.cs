@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using csharp_blog_backend.Models;
+using System.Web;
+
 
 namespace csharp_blog_backend.Controllers
 {
@@ -25,9 +27,8 @@ namespace csharp_blog_backend.Controllers
         public async Task<ActionResult<IEnumerable<Post>>> GetPosts()
         {
           if (_context.Posts == null)
-          {
-              return NotFound();
-          }
+             return NotFound();
+
             return await _context.Posts.ToListAsync();
         }
 
@@ -36,15 +37,12 @@ namespace csharp_blog_backend.Controllers
         public async Task<ActionResult<Post>> GetPost(int id)
         {
           if (_context.Posts == null)
-          {
               return NotFound();
-          }
+
             var post = await _context.Posts.FindAsync(id);
 
             if (post == null)
-            {
                 return NotFound();
-            }
 
             return post;
         }
@@ -55,9 +53,7 @@ namespace csharp_blog_backend.Controllers
         public async Task<IActionResult> PutPost(int id, Post post)
         {
             if (id != post.Id)
-            {
                 return BadRequest();
-            }
 
             _context.Entry(post).State = EntityState.Modified;
 
@@ -68,13 +64,9 @@ namespace csharp_blog_backend.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!PostExists(id))
-                {
                     return NotFound();
-                }
                 else
-                {
                     throw;
-                }
             }
 
             return NoContent();
@@ -83,14 +75,32 @@ namespace csharp_blog_backend.Controllers
         // POST: api/Posts
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Post>> PostPost(Post post)
+        public async Task<ActionResult<Post>> PostPost([FromForm] Post post)
         {
-          if (_context.Posts == null)
-          {
-              return Problem("Entity set 'BlogContext.Posts'  is null.");
-          }
+            FileInfo fileInfo = new FileInfo(post.File.FileName);
+            post.Image = $"FileLocal.{fileInfo.Extension}";
+            
             _context.Posts.Add(post);
             await _context.SaveChangesAsync();
+            //Estrazione File e salvataggio su file system.
+            //Agendo su Request ci prendiamo il file e lo salviamo su file system.
+            string Image = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\Files");
+
+            if (!Directory.Exists(Image))
+                Directory.CreateDirectory(Image);
+
+
+            string fileName = $"immagine-{post.Id}" + fileInfo.Extension;
+
+            string fileNameWithPath = Path.Combine(Image, fileName);
+
+            using (var stream = new FileStream(fileNameWithPath, FileMode.Create))
+            {
+                post.File.CopyTo(stream);
+            }
+
+            if (_context.Posts == null)
+                return Problem("Entity set 'BlogContext.Posts'  is null.");
 
             return CreatedAtAction("GetPost", new { id = post.Id }, post);
         }
@@ -100,14 +110,11 @@ namespace csharp_blog_backend.Controllers
         public async Task<IActionResult> DeletePost(int id)
         {
             if (_context.Posts == null)
-            {
                 return NotFound();
-            }
+            
             var post = await _context.Posts.FindAsync(id);
             if (post == null)
-            {
                 return NotFound();
-            }
 
             _context.Posts.Remove(post);
             await _context.SaveChangesAsync();

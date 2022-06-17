@@ -17,9 +17,10 @@ namespace csharp_blog_backend.Models
         [Column(TypeName = "text")]
         public string Description { get; set; }
 
-        [Required(ErrorMessage = "Il campo è obbligatorio")]
-        public string Image { get; set; }
-
+        
+        public string? Image { get; set; }
+        [NotMapped()]
+        public IFormFile? File { get; set; } = null;
         public Post()
         {
 

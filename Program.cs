@@ -14,9 +14,17 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddControllers();
 
+
+
 //Register Context 2
+//builder.Services.AddDbContext<BlogContext>(options =>
+//options.UseInMemoryDatabase("Posts"));
+
+//Connection String 
+string sConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<BlogContext>(options =>
-options.UseInMemoryDatabase("Posts"));
+  options.UseSqlServer(sConnectionString));
+builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 var app = builder.Build();
 
@@ -29,5 +37,14 @@ app.UseCors();
 app.UseAuthorization();
 
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+
+{
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<BlogContext>();
+    context.Database.EnsureCreated();  //crea il Db
+    //DbInitializer.Initialize(context);  //popola il Db creato da context
+}
 
 app.Run();
