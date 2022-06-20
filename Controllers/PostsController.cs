@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using csharp_blog_backend.Models;
 using System.Web;
+using System.IO;
 
 
 namespace csharp_blog_backend.Controllers
@@ -24,12 +25,20 @@ namespace csharp_blog_backend.Controllers
 
         // GET: api/Posts
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Post>>> GetPosts()
+        public async Task<ActionResult<IEnumerable<Post>>> GetPosts(string? inpSearch)
         {
           if (_context.Posts == null)
              return NotFound();
 
-            return await _context.Posts.ToListAsync();
+          if(inpSearch != null)
+            {
+                string inpSearchLowTrim = inpSearch.ToLower().Trim();
+                return await _context.Posts.Where(x => (x.Title.ToLower().Contains(inpSearchLowTrim)) || (x.Description.ToLower().Contains(inpSearchLowTrim))).ToListAsync();
+            }
+            else
+            {
+                return await _context.Posts.ToListAsync();
+            }
         }
 
         // GET: api/Posts/5
@@ -43,7 +52,7 @@ namespace csharp_blog_backend.Controllers
 
             if (post == null)
                 return NotFound();
-
+          
             return post;
         }
 
@@ -78,29 +87,28 @@ namespace csharp_blog_backend.Controllers
         public async Task<ActionResult<Post>> PostPost([FromForm] Post post)
         {
             FileInfo fileInfo = new FileInfo(post.File.FileName);
-            post.Image = $"FileLocal.{fileInfo.Extension}";
+            Guid g = new Guid();
+            string fileName = g.ToString() + fileInfo.Extension;
             
-            _context.Posts.Add(post);
-            await _context.SaveChangesAsync();
-            //Estrazione File e salvataggio su file system.
-            //Agendo su Request ci prendiamo il file e lo salviamo su file system.
-            string Image = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\Files");
-
+            string Image = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/Files");
             if (!Directory.Exists(Image))
                 Directory.CreateDirectory(Image);
-
-
-            string fileName = $"immagine-{post.Id}" + fileInfo.Extension;
-
             string fileNameWithPath = Path.Combine(Image, fileName);
-
+            post.Image = "https://localhost:5000/Files/" + fileName;
+            //Save to Filesystem
             using (var stream = new FileStream(fileNameWithPath, FileMode.Create))
             {
                 post.File.CopyTo(stream);
             }
-
-            if (_context.Posts == null)
-                return Problem("Entity set 'BlogContext.Posts'  is null.");
+            //Save into DB
+            using (BinaryReader br = new BinaryReader(post.File.OpenReadStream()))
+            {
+               post.ImageBytes = br.ReadBytes((int)post.File.OpenReadStream().Length);   
+            }
+            
+            
+            _context.Posts.Add(post);
+            await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetPost", new { id = post.Id }, post);
         }
